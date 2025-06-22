@@ -402,4 +402,146 @@
             document.querySelectorAll('.road-line').forEach(line => line.style.animationPlayState = 'paused');
             await saveScore(playerName, score, currentQuizKey);
             await displayLeaderboard(currentQuizKey);
-            elements.question.textContent = `퀴즈 완료! 최종 점수: ${scor
+            elements.question.textContent = `퀴즈 완료! 최종 점수: ${score}점`;
+            elements.answersContainer.innerHTML = '';
+            elements.playerInfo.classList.add('hidden');
+            elements.scoreDisplay.classList.add('hidden');
+            elements.startTitle.textContent = "게임 클리어!";
+            elements.startDesc.innerHTML = `최종 점수: <span class="text-2xl text-white font-bold">${score}</span>점`;
+            elements.nameInputContainer.classList.add('hidden');
+            elements.quizSelectionContainer.classList.add('hidden');
+            elements.leaderboard.classList.remove('hidden');
+            elements.restartContainer.classList.remove('hidden'); 
+            elements.startScreen.classList.remove('hidden');
+        };
+
+        const updateCarPosition = () => {
+            const laneWidth = elements.gameScreen.offsetWidth / 3;
+            elements.car.style.left = `${(carPosition * laneWidth) + (laneWidth / 2)}px`;
+        };
+
+        const moveCar = (direction) => {
+            if (!isGameActive) return;
+            if (direction === 'left' && carPosition > 0) carPosition--;
+            else if (direction === 'right' && carPosition < 2) carPosition++;
+            updateCarPosition();
+        };
+
+        const updateScore = () => { elements.score.textContent = score; };
+
+        const saveScore = async (name, score, quizKey) => {
+            if (!db) return;
+            const collectionName = `haesol-lala-quiz-scores-${quizKey}`;
+            try { await addDoc(collection(db, collectionName), { name, score, createdAt: serverTimestamp() }); } 
+            catch (e) { console.error("Error adding document: ", e); }
+        };
+
+        const displayLeaderboard = async (quizKey) => {
+            if (!db) return;
+            const collectionName = `haesol-lala-quiz-scores-${quizKey}`;
+            const quizTitle = Object.keys(quizzes).find(key => key.replace(/[^a-zA-Z0-9가-힣]/g, '') === quizKey);
+            elements.leaderboardTitle.textContent = `🏆 ${quizTitle} 명예의 전당 🏆`;
+            elements.leaderboardList.innerHTML = '<li>불러오는 중...</li>';
+            try {
+                const q = query(collection(db, collectionName), orderBy("score", "desc"), limit(5));
+                const querySnapshot = await getDocs(q);
+                elements.leaderboardList.innerHTML = '';
+                if (querySnapshot.empty) {
+                    elements.leaderboardList.innerHTML = '<li>아직 랭킹이 없습니다.</li>';
+                    return;
+                }
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${data.name}</span><span>${data.score}점</span>`;
+                    elements.leaderboardList.appendChild(li);
+                });
+            } catch (e) {
+                console.error("Error getting documents: ", e);
+                elements.leaderboardList.innerHTML = '<li>랭킹을 불러오지 못했습니다.</li>';
+            }
+        };
+
+        const populateQuizOptions = () => {
+            elements.quizOptions.innerHTML = ''; 
+            const finalQuizzes = {
+                '엄마 걱정': quizzes['엄마 걱정'],
+                '동백꽃': [
+                    { question: "이 소설의 서술자는 누구인가?", answers: ["점순이", "나", "작가"], correct: 1 },
+                    { question: "이 소설의 서술 방식(시점)은 무엇인가?", answers: ["1인칭 주인공 시점", "1인칭 관찰자 시점", "전지적 작가 시점"], correct: 0 },
+                    { question: "이 소설의 배경이 되는 계절은?", answers: ["봄", "여름", "가을"], correct: 0 },
+                    { question: "점순이가 '나'에게 감자를 준 이유는 무엇인가?", answers: ["'나'를 동정해서", "'나'에게 관심을 표현하려고", "'나'를 골탕 먹이려고"], correct: 1 },
+                    { question: "'나'가 점순이의 감자를 거절한 이유는?", answers: ["감자를 싫어해서", "점순이의 호의를 오해해서", "배가 불러서"], correct: 1 },
+                    { question: "점순이가 '나'의 집 씨암탉을 괴롭히는 이유는?", answers: ["닭싸움을 좋아해서", "'나'에 대한 서운함과 복수심", "닭이 미워서"], correct: 1 },
+                    { question: "이 소설에서 갈등의 원인이 되는 소재는?", answers: ["닭싸움", "고추장", "감자"], correct: 2 },
+                    { question: "'나'는 점순네 수탉을 이기기 위해 자기 닭에게 무엇을 먹이는가?", answers: ["보약", "고추장", "감자"], correct: 1 },
+                    { question: "'나'가 점순네 닭을 때려죽인 이유는 무엇인가?", answers: ["자신의 닭이 계속 져서 화가 나서", "점순이가 시켜서", "닭이 불쌍해서"], correct: 0 },
+                    { question: "'나'와 점순이의 갈등이 해소되고 화해하는 계기가 되는 소재는?", answers: ["감자", "닭", "동백꽃"], correct: 2 },
+                    { question: "이 작품의 웃음을 유발하는 가장 큰 요인은?", answers: ["점순이의 엉뚱한 행동", "서술자 '나'의 어수룩함", "닭들의 우스꽝스러운 싸움"], correct: 1 },
+                    { question: "이 작품의 구성 방식으로 옳은 것은?", answers: ["시간 순서에 따른 구성", "과거와 현재가 교차되는 역순행적 구성", "여러 이야기를 나열하는 구성"], correct: 1 },
+                    { question: "'느 집엔 이거 없지?'라는 점순이의 말에 담긴 진짜 의도는?", answers: ["자랑하려는 마음", "무시하려는 마음", "관심을 표현하는 마음"], correct: 2 },
+                    { question: "이 소설에서 '동백꽃'의 역할로 가장 적절한 것은?", answers: ["갈등을 심화시킴", "향토적, 낭만적 분위기를 조성함", "주인공의 가난을 상징함"], correct: 1 },
+                    { question: "점순이가 '나'를 대하는 방식의 특징은?", answers: ["직설적", "반어적", "우회적"], correct: 1 },
+                    { question: "'나'와 점순이 집안의 관계는 어떠한가?", answers: ["대등한 관계", "원수 관계", "지주-소작인 관계"], correct: 2 },
+                    { question: "점순이가 '나'에게 '요담부터 또 그래 봐라'라고 말한 이유는?", answers: ["앞으로도 계속 괴롭히겠다는 경고", "자신의 마음을 받아달라는 표현", "닭을 죽인 것에 대한 용서"], correct: 1 },
+                    { question: "이 작품은 어떤 분위기를 바탕으로 하고 있는가?", answers: ["비극적, 애상적", "해학적, 향토적", "교훈적, 비판적"], correct: 1 },
+                    { question: "작품의 마지막에 '나'와 점순이가 동백꽃 속에 파묻히는 장면이 의미하는 바는?", answers: ["갈등의 절정", "순수한 사랑의 시작", "현실로부터의 도피"], correct: 1 },
+                    { question: "이 작품의 제목인 '동백꽃'은 실제로는 어떤 꽃을 가리키는가?", answers: ["생강나무꽃", "진달래꽃", "산수유꽃"], correct: 0 }
+                ],
+                '읽기의 생활화': quizzes['읽기의 생활화'],
+                '담화': quizzes['담화'],
+                '먼 후일': quizzes['먼 후일'],
+                '양반전': quizzes['양반전']
+            };
+            
+            Object.keys(finalQuizzes).forEach(quizName => {
+                const btn = document.createElement('button');
+                btn.textContent = quizName;
+                btn.className = "quiz-select-btn w-full bg-indigo-500 text-white font-bold py-3 px-2 rounded-lg text-sm md:text-base active:bg-indigo-700";
+                btn.onclick = () => {
+                    setupAudio();
+                    playerName = elements.playerNameInput.value.trim();
+                    if (!playerName) {
+                        elements.playerNameInput.placeholder = "이름을 꼭 입력해주세요!";
+                        elements.playerNameInput.classList.add('border-red-500');
+                        setTimeout(() => {
+                            elements.playerNameInput.classList.remove('border-red-500');
+                            elements.playerNameInput.placeholder = "이름";
+                        }, 1500);
+                        return;
+                    }
+                    currentQuizKey = quizName.replace(/[^a-zA-Z0-9가-힣]/g, '');
+                    currentQuizData = finalQuizzes[quizName];
+                    initGame();
+                };
+                elements.quizOptions.appendChild(btn);
+            });
+        };
+
+        const resetToSelection = () => {
+            elements.startTitle.textContent = "해솔중&라라중 국어 기말대비 퀴즈";
+            elements.startDesc.textContent = "플레이할 작품을 선택하세요!";
+            elements.restartContainer.classList.add('hidden');
+            elements.leaderboard.classList.add('hidden');
+            elements.nameInputContainer.classList.remove('hidden');
+            elements.quizSelectionContainer.classList.remove('hidden');
+        };
+        
+        populateQuizOptions();
+
+        document.addEventListener('keydown', (e) => {
+            if (elements.startScreen.classList.contains('hidden')) {
+                if (e.key === 'ArrowLeft') moveCar('left');
+                else if (e.key === 'ArrowRight') moveCar('right');
+                else if (e.key === 'ArrowUp' || e.key === ' ') { e.preventDefault(); checkAnswerNow(); }
+            }
+        });
+
+        elements.moveLeftBtn.addEventListener('click', () => moveCar('left'));
+        elements.moveRightBtn.addEventListener('click', () => moveCar('right'));
+        elements.moveForwardBtn.addEventListener('click', checkAnswerNow);
+        elements.restartButton.addEventListener('click', resetToSelection);
+        window.addEventListener('resize', () => { if (isGameActive) updateCarPosition(); });
+    </script>
+</body>
+</html>
