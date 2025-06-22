@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>해솔중&라라중 국어 기말대비 퀴즈</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <script>
+        function setScreenHeight() {
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        setScreenHeight();
+        window.addEventListener('resize', setScreenHeight);
+    </script>
+    <style>
+        body {
+            font-family: 'Jua', sans-serif;
+            touch-action: manipulation;
+        }
+        #game-container {
+            height: calc(var(--vh, 1vh) * 100);
+        }
+        @media (min-width: 640px) {
+            #game-container {
+                height: 90vh;
+                max-height: 800px;
+            }
+        }
+        .road-line {
+            position: absolute; width: 6px; height: 100%; top: 0;
+            background-image: linear-gradient(to bottom, white 50%, transparent 50%);
+            background-size: 100% 70px; animation: road-lines 2.5s linear infinite;
+        }
+        @keyframes road-lines { from { background-position: 0 0; } to { background-position: 0 70px; } }
+        @keyframes fall { from { transform: translateY(-100px); } to { transform: translateY(100vh); } }
+        .falling { animation: fall 10s linear; }
+        #car { transition: left 0.2s ease-out; }
+        .modal { transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; }
+        .modal.hidden { opacity: 0; transform: scale(0.9); pointer-events: none; }
+        #player-name-input { border: 2px solid #6366f1; transition: border-color 0.3s; }
+        #player-name-input:focus { outline: none; border-color: #a5b4fc; }
+        #leaderboard ol { list-style-type: decimal; padding-left: 2rem; }
+        #leaderboard li { display: flex; justify-content: space-between; }
+        .quiz-select-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .quiz-select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-800 flex items-center justify-center min-h-screen overflow-hidden">
+
+    <div id="game-container" class="w-full max-w-md bg-gray-600 rounded-lg shadow-2xl flex flex-col relative overflow-hidden border-4 border-gray-700">
+        
+        <div class="absolute top-1.5 left-1/2 -translate-x-1/2 text-xs text-gray-400 z-30">배곧국풀국어학원</div>
+
+        <div class="bg-gray-900 text-white p-4 shadow-lg z-20 flex flex-col space-y-2">
+            <div class="flex justify-between items-center text-base md:text-lg font-bold pt-4">
+                <div id="player-info" class="hidden">Player: <span id="player-name-display"></span></div>
+                <div id="score-display" class="hidden">점수: <span id="score">0</span></div>
+            </div>
+            <div id="question" class="text-center text-lg md:text-xl min-h-[5rem] flex items-center justify-center px-2 border-t border-gray-700 pt-2"></div>
+        </div>
+
+        <div id="game-screen" class="flex-1 relative">
+            <div class="road-line" style="left: 33.33%; transform: translateX(-50%);"></div>
+            <div class="road-line" style="left: 66.66%; transform: translateX(-50%);"></div>
+            <div id="car" class="w-12 h-16 absolute bottom-8 left-1/2 -translate-x-1/2 text-5xl z-10">🚓</div>
+            <div id="answers-container" class="absolute w-full h-24 flex justify-around" style="top: 0;"></div>
+        </div>
+
+        <div class="bg-gray-900 p-2 flex justify-center space-x-2 sm:hidden z-20">
+            <button id="move-left-btn" class="w-1/3 bg-blue-500 text-white font-bold py-4 px-4 rounded-lg text-2xl active:bg-blue-700">◀</button>
+            <button id="move-forward-btn" class="w-1/3 bg-green-500 text-white font-bold py-4 px-4 rounded-lg text-2xl active:bg-green-700">▲</button>
+            <button id="move-right-btn" class="w-1/3 bg-blue-500 text-white font-bold py-4 px-4 rounded-lg text-2xl active:bg-blue-700">▶</button>
+        </div>
+
+        <div id="start-screen" class="modal absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center z-30 px-4 overflow-y-auto py-4">
+            <h1 id="start-title" class="text-3xl md:text-4xl font-bold text-white mb-4 text-center">해솔중&라라중 국어 기말대비 퀴즈</h1>
+            
+            <div id="name-input-container" class="w-full max-w-sm mb-4 flex-shrink-0">
+                <label for="player-name-input" class="block text-white text-center mb-2">플레이어 이름을 입력하세요</label>
+                <input type="text" id="player-name-input" class="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-center font-bold" placeholder="이름" maxlength="10">
+            </div>
+
+            <div id="quiz-selection-container" class="w-full max-w-sm flex-shrink-0">
+                 <p id="start-desc" class="text-yellow-300 text-lg mb-4 text-center">플레이할 챕터를 선택하세요!</p>
+                 <div id="quiz-options" class="grid grid-cols-2 gap-3">
+                 </div>
+            </div>
+            
+            <div id="leaderboard" class="mt-6 w-full max-w-sm text-white bg-gray-800 bg-opacity-50 p-4 rounded-lg hidden flex-shrink-0">
+                <h3 id="leaderboard-title" class="text-2xl text-yellow-300 font-bold text-center mb-2">🏆 명예의 전당 🏆</h3>
+                <ol id="leaderboard-list" class="text-lg"></ol>
+            </div>
+
+            <div id="restart-container" class="mt-6 hidden flex-shrink-0">
+                <button id="restart-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-full text-2xl shadow-lg transform hover:scale-105 transition-transform">
+                    챕터 선택으로
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+
+        const elements = {
+            car: document.getElementById('car'),
+            gameScreen: document.getElementById('game-screen'),
+            question: document.getElementById('question'),
+            score: document.getElementById('score'),
+            answersContainer: document.getElementById('answers-container'),
+            startScreen: document.getElementById('start-screen'),
+            startTitle: document.getElementById('start-title'),
+            startDesc: document.getElementById('start-desc'),
+            moveLeftBtn: document.getElementById('move-left-btn'),
+            moveRightBtn: document.getElementById('move-right-btn'),
+            moveForwardBtn: document.getElementById('move-forward-btn'),
+            playerNameInput: document.getElementById('player-name-input'),
+            playerNameDisplay: document.getElementById('player-name-display'),
+            playerInfo: document.getElementById('player-info'),
+            scoreDisplay: document.getElementById('score-display'),
+            nameInputContainer: document.getElementById('name-input-container'),
+            quizSelectionContainer: document.getElementById('quiz-selection-container'),
+            quizOptions: document.getElementById('quiz-options'),
+            leaderboard: document.getElementById('leaderboard'),
+            leaderboardTitle: document.getElementById('leaderboard-title'),
+            leaderboardList: document.getElementById('leaderboard-list'),
+            restartContainer: document.getElementById('restart-container'),
+            restartButton: document.getElementById('restart-button')
+        };
+        
+        let db;
+        try {
+            const firebaseConfig = {
+                apiKey: "AIzaSyDcagfE320vd1DuT6uZ8mHhVy2yB74C1q0",
+                authDomain: "grammar-294b6.firebaseapp.com",
+                projectId: "grammar-294b6",
+                storageBucket: "grammar-294b6.appspot.com",
+                messagingSenderId: "865611264169",
+                appId: "1:865611264169:web:84b9e6d784c3b41bd139b8"
+            };
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            const auth = getAuth(app);
+            signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
+        } catch (e) { console.error("Firebase initialization failed:", e); }
+
+        let audioCtx;
+        const setupAudio = () => { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); };
+        const playSound = (type) => {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            if (type === 'correct') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            } else {
+                osc.type = 'square'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            }
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        };
+
+        const quizzes = {
+            '엄마 걱정': [
+                { question: "시에서 말하는 이를 무엇이라고 하는가?", answers: ["시인", "독자", "화자"], correct: 2 },
+                { question: "이 시의 화자는 어떤 시절을 회상하고 있는가?", answers: ["노년", "청년", "유년"], correct: 2 },
+                { question: "1연에서 화자가 느끼는 주된 정서 두 가지는?", answers: ["기쁨, 설렘", "분노, 원망", "두려움, 외로움"], correct: 2 },
+                { question: "화자의 외로운 처지를 드러내는 시어가 아닌 것은?", answers: ["찬밥", "열무", "빈방"], correct: 1 },
+                { question: "시에서 '해는 시든 지 오래'라는 표현에 사용된 주된 표현법은?", answers: ["직유법", "활유법", "은유법"], correct: 1 },
+                { question: "엄마의 지친 모습을 비유적으로 표현한 시어는?", answers: ["찬밥", "배춧잎", "윗목"], correct: 1 },
+                { question: "화자의 유년 시절이 춥고 힘들었음을 비유적으로 나타내는 시어는?", answers: ["금간 창틈", "빗소리", "윗목"], correct: 2 },
+                { question: "'안 오시네'라는 표현을 반복하여 강조하는 것은?", answers: ["엄마에 대한 원망", "기다림의 간절함", "시간의 흐름"], correct: 1 },
+                { question: "화자의 경제적 어려움을 암시하는 시어는?", answers: ["빗소리", "금간 창틈", "찬밥"], correct: 1 },
+                { question: "2연에서 화자가 '지금도 내 눈시울을 뜨겁게' 하는 이유는?", answers: ["엄마가 보고 싶어서", "유년 시절의 슬픔이 떠올라서", "눈에 병이 나서"], correct: 1 },
+                { question: "이 시는 시간적으로 어떻게 구성되어 있는가?", answers: ["현재->과거", "과거->현재", "과거->현재->과거"], correct: 1 },
+                { question: "시의 분위기를 조성하며 화자의 외로움을 심화시키는 청각적 심상은?", answers: ["발소리", "빗소리", "훌쩍이는 소리"], correct: 1 },
+                { question: "'찬밥처럼 방에 담겨'는 화자의 어떤 처지를 비유하는가?", answers: ["따돌림 당하는 처지", "혼자 남겨진 외로운 처지", "배고픈 처지"], correct: 1 },
+                { question: "화자는 '아무리 천천히 숙제를 해도' 엄마가 오지 않는다고 말한다. 이 행동의 의도는?", answers: ["공부를 열심히 하기 위해", "엄마를 기다리는 시간을 버티기 위해", "숙제가 너무 많아서"], correct: 1 },
+                { question: "이 시에서 '엄마'는 어떤 이미지로 그려지는가?", answers: ["가족을 위해 고생하는 모습", "자식을 엄하게 대하는 모습", "여유롭고 행복한 모습"], correct: 0 },
+                { question: "2연에서 '그 시절'이 가리키는 것은?", answers: ["시장이 파한 뒤", "성인이 된 지금", "어린 시절"], correct: 2 },
+                { question: "이 시는 명사형으로 시를 종결하여 무엇을 주고 있는가?", answers: ["희망", "여운", "긴장감"], correct: 1 },
+                { question: "화자가 1연의 '나'와 2연의 '나'는 동일 인물이다. (O/X)", answers: ["O", "X"], correct: 0 },
+                { question: "이 시의 화자는 엄마를 원망하고 있다. (O/X)", answers: ["O", "X"], correct: 1 },
+                { question: "이 시에서 화자가 자신의 감정을 직접적으로 드러낸 표현은?", answers: ["찬밥처럼", "훌쩍거리던", "배춧잎 같은"], correct: 1 }
+            ],
+            '동백꽃': [
+                { question: "이 소설의 서술자는 누구인가?", answers: ["점순이", "나", "작가"], correct: 1 },
+                { question: "이 소설의 서술 방식(시점)은 무엇인가?", answers: ["1인칭 주인공 시점", "1인칭 관찰자 시점", "전지적 작가 시점"], correct: 0 },
+                { question: "이 소설의 배경이 되는 계절은?", answers: ["봄", "여름", "가을"], correct: 0 },
+                { question: "점순이가 '나'에게 감자를 준 이유는 무엇인가?", answers: ["'나'를 동정해서", "'나'에게 관심을 표현하려고", "'나'를 골탕 먹이려고"], correct: 1 },
+                { question: "'나'가 점순이의 감자를 거절한 이유는?", answers: ["감자를 싫어해서", "점순이의 호의를 오해해서", "배가 불러서"], correct: 1 },
+                { question: "점순이가 '나'의 집 씨암탉을 괴롭히는 이유는?", answers: ["닭싸움을 좋아해서", "'나'에 대한 서운함과 복수심", "닭이 미워서"], correct: 1 },
+                { question: "이 소설에서 갈등의 원인이 되는 소재는?", answers: ["닭싸움", "고추장", "감자"], correct: 2 },
+                { question: "'나'는 점순네 수탉을 이기기 위해 자기 닭에게 무엇을 먹이는가?", answers: ["보약", "고추장", "감자"], correct: 1 },
+                { question: "'나'가 점순네 닭을 때려죽인 이유는 무엇인가?", answers: ["자신의 닭이 계속 져서 화가 나서", "점순이가 시켜서", "닭이 불쌍해서"], correct: 0 },
+                { question: "'나'와 점순이의 갈등이 해소되고 화해하는 계기가 되는 소재는?", answers: ["감자", "닭", "동백꽃"], correct: 2 },
+                { question: "이 작품의 웃음을 유발하는 가장 큰 요인은?", answers: ["점순이의 엉뚱한 행동", "서술자 '나'의 어수룩함", "닭들의 우스꽝스러운 싸움"], correct: 1 },
+                { question: "이 작품의 구성 방식으로 옳은 것은?", answers: ["시간 순서에 따른 구성", "과거와 현재가 교차되는 역순행적 구성", "여러 이야기를 나열하는 구성"], correct: 1 },
+                { question: "'느 집엔 이거 없지?'라는 점순이의 말에 담긴 진짜 의도는?", answers: ["자랑하려는 마음", "무시하려는 마음", "관심을 표현하는 마음"], correct: 2 },
+                { question: "이 소설에서 '동백꽃'의 역할로 가장 적절한 것은?", answers: ["갈등을 심화시킴", "향토적, 낭만적 분위기를 조성함", "주인공의 가난을 상징함"], correct: 1 },
+                { question: "점순이가 '나'를 대하는 방식의 특징은?", answers: ["직설적", "반어적", "우회적"], correct: 1 },
+                { question: "'나'와 점순이 집안의 관계는 어떠한가?", answers: ["대등한 관계", "원수 관계", "지주-소작인 관계"], correct: 2 },
+                { question: "점순이가 '나'에게 '요담부터 또 그래 봐라'라고 말한 이유는?", answers: ["앞으로도 계속 괴롭히겠다는 경고", "자신의 마음을 받아달라는 표현", "닭을 죽인 것에 대한 용서"], correct: 1 },
+                { question: "이 작품은 어떤 분위기를 바탕으로 하고 있는가?", answers: ["비극적, 애상적", "해학적, 향토적", "교훈적, 비판적"], correct: 1 },
+                { question: "작품의 마지막에 '나'와 점순이가 동백꽃 속에 파묻히는 장면이 의미하는 바는?", answers: ["갈등의 절정", "순수한 사랑의 시작", "현실로부터의 도피"], correct: 1 },
+                { question: "이 작품의 제목인 '동백꽃'은 실제로는 어떤 꽃을 가리키는가?", answers: ["생강나무꽃", "진달래꽃", "산수유꽃"], correct: 0 }
+            ],
+            '읽기의 생활화': [
+                { question: "글쓴이가 중학교 시절 도서반을 선택한 이유는?", answers: ["책을 좋아해서", "선생님의 추천으로", "몸을 움직이기 싫어서"], correct: 2 },
+                { question: "글쓴이가 처음 읽은 박지원의 소설은 무엇이었는가?", answers: ["양반전", "호질", "허생전"], correct: 2 },
+                { question: "글쓴이가 박지원 소설을 거부감 없이 읽은 이유는?", answers: ["내용이 쉬워서", "무협지에 익숙해서", "친구가 추천해서"], correct: 1 },
+                { question: "무협지와 박지원 소설의 공통점은?", answers: ["문체가 아름답다", "주인공의 행적 구조", "읽고 나면 기억에 남는다"], correct: 1 },
+                { question: "박지원 소설이 무협지와 다른 점은?", answers: ["재미가 없다", "생각할 거리를 준다", "주인공이 패배한다"], correct: 1 },
+                { question: "글쓴이는 박지원 소설을 무엇에 비유했는가?", answers: ["보약", "보석", "다리"], correct: 0 },
+                { question: "글쓴이가 '몇백 년 전 사람의 숨결'을 느낀 경험은?", answers: ["독서", "박물관 관람", "역사 공부"], correct: 0 },
+                { question: "글쓴이가 소설가가 된 결정적인 계기가 된 책은?", answers: ["무협지", "박지원의 책", "현대 소설"], correct: 1 },
+                { question: "이 글에서 강조하는 읽기의 가치는?", answers: ["지식 습득", "정신세계의 성장", "성공"], correct: 1 },
+                { question: "제목 「맛있는 책, 일생의 보약」의 의미는?", answers: ["책이 비싸다", "책이 정신을 풍요롭게 한다", "책이 맛있다"], correct: 1 },
+                { question: "글쓴이가 박지원 소설에 '뿌듯함'을 느낀 이유는?", answers: ["내용이 재미있어서", "우리 조상의 글이라서", "친구들에게 자랑해서"], correct: 1 },
+                { question: "글쓴이가 말하는 '진정한 인간으로 나아가는 통로'는?", answers: ["여행", "책", "명상"], correct: 1 },
+                { question: "도서반 선생님이 학생들에게 권장한 활동은?", answers: ["독서 토론", "서평 쓰기", "마음에 드는 책 읽기"], correct: 2 },
+                { question: "글쓴이는 현대 소설을 어떻게 느꼈는가?", answers: ["가볍게 느껴짐", "심오하게 느껴짐", "재미없게 느껴짐"], correct: 0 },
+                { question: "박지원 소설을 읽으며 글쓴이의 정신세계가 어떻게 되었다고 했는가?", answers: ["혼란스러워짐", "더 넓어지고 수준이 높아짐", "단순해짐"], correct: 1 },
+                { question: "글쓴이에게 특별 활동 시간은 어떤 의미였는가?", answers: ["지루한 시간", "인생을 바꾼 시간", "친구와 노는 시간"], correct: 1 },
+                { question: "이 글의 갈래로 가장 적절한 것은?", answers: ["소설", "시", "수필"], correct: 2 },
+                { question: "글쓴이가 말하는 '고전'의 특징이 아닌 것은?", answers: ["읽을수록 새로운 맛이 남", "문장이 품위 있고 아름다움", "한두 번 읽고 나면 재미없음"], correct: 2 },
+                { question: "글쓴이는 책을 통해 인간의 어떤 세계에 닿을 수 있다고 했는가?", answers: ["물질적 세계", "지극한 정신문화", "초자연적 세계"], correct: 1 },
+                { question: "글쓴이는 궁극적으로 독서가 무엇을 보여주는 길이라고 말했는가?", answers: ["부를 얻는 길", "인간다운 삶을 추구하는 길", "권력을 잡는 길"], correct: 1 }
+            ],
+            '담화': [
+                { question: "화자와 청자가 주고받는 발화의 연속체를 무엇이라고 하는가?", answers: ["문장", "담화", "어절"], correct: 1 },
+                { question: "담화의 구성 요소가 아닌 것은?", answers: ["화자", "청자", "문법"], correct: 2 },
+                { question: "담화의 내용이 주제를 향해 밀접하게 연관되는 특성은?", answers: ["응집성", "통일성", "맥락성"], correct: 1 },
+                { question: "담화를 구성하는 문장들이 형식적으로 긴밀하게 연결되는 특성은?", answers: ["응집성", "통일성", "상황성"], correct: 0 },
+                { question: "응집성을 높이기 위해 사용하는 표현이 아닌 것은?", answers: ["지시 표현", "접속 표현", "감탄 표현"], correct: 2 },
+                { question: "담화의 해석에 영향을 미치는 장면 자체와 관련된 맥락은?", answers: ["상황 맥락", "사회·문화적 맥락", "역사적 맥락"], correct: 0 },
+                { question: "담화의 해석에 영향을 미치는 사회·문화적 배경, 관습 등과 관련된 맥락은?", answers: ["상황 맥락", "사회·문화적 맥락", "언어적 맥락"], correct: 1 },
+                { question: "협력의 원리 중, 대화 목적에 필요한 만큼만 정보를 제공해야 한다는 격률은?", answers: ["질의 격률", "양의 격률", "태도의 격률"], correct: 1 },
+                { question: "협력의 원리 중, 진실되고 타당한 근거를 들어 말해야 한다는 격률은?", answers: ["질의 격률", "양의 격률", "관련성의 격률"], correct: 0 },
+                { question: "협력의 원리 중, 모호하거나 중의적 표현을 피해야 한다는 격률은?", answers: ["관련성의 격률", "태도의 격률", "질의 격률"], correct: 1 },
+                { question: "공손성의 원리 중, 상대에게 부담은 최소화하고 이익은 최대화하라는 격률은?", answers: ["관용의 격률", "찬동의 격률", "요령의 격률"], correct: 2 },
+                { question: "공손성의 원리 중, 자신에 대한 칭찬은 최소화하고 겸손하라는 격률은?", answers: ["겸양의 격률", "동의의 격률", "요령의 격률"], correct: 0 },
+                { question: "공손성의 원리 중, 상대방에 대한 비방은 최소화하고 칭찬은 최대화하라는 격률은?", answers: ["요령의 격률", "찬동의 격률", "관용의 격률"], correct: 1 },
+                { question: "다른 사람에게 인정받고 존중받고 싶은 욕구와 관련된 체면은?", answers: ["적극적 체면", "소극적 체면", "공격적 체면"], correct: 0 },
+                { question: "다른 사람에게 방해받지 않고 자유롭게 행동하고 싶은 욕구와 관련된 체면은?", answers: ["적극적 체면", "공격적 체면", "소극적 체면"], correct: 2 },
+                { question: "명령문보다 의문문으로 부탁하는 것이 상대의 어떤 체면을 지켜주는 것인가?", answers: ["적극적 체면", "소극적 체면", "사회적 체면"], correct: 1 },
+                { question: "A: '오늘 저녁 뭐 먹을까?' B: '어제 본 드라마 정말 재밌더라.' B는 어떤 격률을 어겼는가?", answers: ["질의 격률", "양의 격률", "관련성의 격률"], correct: 2 },
+                { question: "'제가 한 건 별로 없고 다 팀원들 덕분입니다.'는 어떤 격률을 지킨 표현인가?", answers: ["관용의 격률", "요령의 격률", "찬동의 격률"], correct: 0 },
+                { question: "'네 생각도 일리가 있지만, 이 부분은 조금 다른 것 같아.'는 어떤 격률을 지킨 표현인가?", answers: ["찬동의 격률", "겸양의 격률", "동의의 격률"], correct: 2 },
+                { question: "우리나라의 '차린 건 없지만 많이 먹어라'와 같은 표현을 이해하기 위해 고려해야 할 맥락은?", answers: ["상황 맥락", "사회·문화적 맥락", "개인적 맥락"], correct: 1 }
+            ],
+            '먼 후일': [
+                { question: "이 시의 핵심 표현 방법은 무엇인가?", answers: ["역설", "반어", "풍자"], correct: 1 },
+                { question: "화자가 '잊었노라'라고 말하지만, 실제 속마음은 어떠한가?", answers: ["정말로 잊었다", "잊지 못하고 그리워한다", "증오하고 있다"], correct: 1 },
+                { question: "이 시의 화자는 어떤 상황을 가정하고 있는가?", answers: ["'당신'과 재회하는 상황", "먼 훗날 '당신'이 찾아오는 상황", "'당신'을 영원히 못 보는 상황"], correct: 1 },
+                { question: "이 시에서 운율을 형성하는 요소가 아닌 것은?", answers: ["3음보의 반복", "'-노라'의 반복", "색채어의 반복"], correct: 2 },
+                { question: "'오늘도 어제도 아니 잊고'라는 구절을 통해 알 수 있는 것은?", answers: ["화자의 변덕스러운 마음", "화자의 진심", "화자의 무관심"], correct: 1 },
+                { question: "반어법을 사용하여 얻는 효과로 거리가 먼 것은?", answers: ["화자의 정서 강조", "독자의 흥미 유발", "내용을 직접적으로 전달"], correct: 2 },
+                { question: "화자는 '당신'이 자신을 나무랄 것을 예상하고 있다. (O/X)", answers: ["O", "X"], correct: 0 },
+                { question: "이 시의 전체적인 어조는 어떠한가?", answers: ["격정적, 남성적", "애상적, 여성적", "해학적, 풍자적"], correct: 1 },
+                { question: "'무척 그리다가 잊었노라'라는 표현의 모순은 무엇인가?", answers: ["그리워하면서 동시에 잊을 수는 없음", "무척과 잊었노라의 의미 충돌", "시적 허용의 오류"], correct: 0 },
+                { question: "이 시의 주제는 무엇인가?", answers: ["이별의 극복", "떠나간 임에 대한 변함없는 사랑", "재회에 대한 희망"], correct: 1 },
+                { question: "이 시는 총 몇 개의 연으로 이루어져 있는가?", answers: ["3연", "4연", "5연"], correct: 1 },
+                { question: "각 연의 마지막 행에 반복되는 시어는 무엇인가?", answers: ["먼 훗날", "나무라면", "잊었노라"], correct: 2 },
+                { question: "화자의 정서가 점층적으로 심화되고 있음을 보여주는 시어는?", answers: ["그때에 -> 그래도 -> 오늘도 어제도", "잊었노라 -> 잊었노라 -> 잊었노라", "당신이 -> 당신이 -> 당신이"], correct: 0 },
+                { question: "이 시에서 '당신'은 화자에게 어떤 존재인가?", answers: ["원망의 대상", "잊고 싶은 존재", "그리움의 대상"], correct: 2 },
+                { question: "'믿기지 않아서 잊었노라'라는 말의 속뜻은?", answers: ["너무 그리워 믿을 수 없었다", "당신을 믿을 수 없어 잊었다", "당신과의 이별이 믿기지 않았다"], correct: 2 },
+                { question: "이 시의 작가는 누구인가?", answers: ["한용운", "김소월", "정지용"], correct: 1 },
+                { question: "화자는 '당신'이 다시 찾아올 것이라고 확신하고 있다. (O/X)", answers: ["O", "X"], correct: 0 },
+                { question: "이 시의 운율은 주로 무엇을 통해 형성되는가?", answers: ["글자 수의 규칙적 배열", "유사한 구문과 시어의 반복", "행의 길이 변화"], correct: 1 },
+                { question: "반어법을 통해 화자의 어떤 감정이 더욱 애절하게 느껴지는가?", answers: ["분노", "그리움", "기쁨"], correct: 1 },
+                { question: "이 시는 미래의 상황을 설정하여 화자의 현재 심정을 드러낸다. (O/X)", answers: ["O", "X"], correct: 0 }
+            ],
+            '양반전': [
+                { question: "이 작품의 핵심적인 표현 방법은?", answers: ["반어", "역설", "풍자"], correct: 2 },
+                { question: "이 작품이 비판하고자 하는 대상은?", answers: ["가난한 평민", "무능하고 부도덕한 양반 계층", "신흥 부자 계층"], correct: 1 },
+                { question: "작품의 시대적 배경은 언제인가?", answers: ["조선 전기", "조선 후기", "고려 시대"], correct: 1 },
+                { question: "가난한 양반이 관청의 곡식을 갚지 못하자, 그 양반 신분을 사려고 한 인물은?", answers: ["군수", "부자", "상인"], correct: 1 },
+                { question: "첫 번째 매매 증서에 담긴 내용은 주로 무엇에 관한 것인가?", answers: ["양반이 누릴 수 있는 특권", "양반이 지켜야 할 허례허식", "양반의 재산 목록"], correct: 1 },
+                { question: "두 번째 매매 증서에 담긴 내용은 주로 무엇에 관한 것인가?", answers: ["양반으로서의 도덕적 의무", "백성을 착취하는 양반의 특권", "나라에 충성하는 방법"], correct: 1 },
+                { question: "부자가 결국 양반이 되기를 포기한 이유는?", answers: ["돈이 아까워서", "양반의 삶이 재미없고 부당해서", "군수가 말려서"], correct: 1 },
+                { "question": "'양반은 한 푼어치도 안 되는구려!'라는 말은 양반의 어떤 점을 비판하는가?", "answers": ["비도덕성", "위선", "경제적 무능"], "correct": 2 },
+                { "question": "이 소설에서 '군수'의 역할은 무엇인가?", "answers": ["양반을 옹호함", "부자의 편을 듦", "사건을 중재하고 풍자를 심화시킴"], "correct": 2 },
+                { "question": "이 작품을 통해 알 수 있는 조선 후기 사회의 모습은?", "answers": ["신분제가 더욱 공고해짐", "신분제가 흔들리고 있음", "모두가 평등해짐"], "correct": 1 },
+                { "question": "이 작품의 작가는 누구인가?", "answers": ["박지원", "정약용", "허균"], "correct": 0 },
+                { "question": "양반의 아내가 남편을 나무란 이유는?", "answers": ["바람을 피워서", "돈을 벌지 못해서", "책 읽기가 환곡 갚는 데 소용없어서"], "correct": 2 },
+                { "question": "부자가 양반이 되고 싶어 했던 이유는?", "answers": ["존귀한 대우를 받고 싶어서", "벼슬을 하고 싶어서", "더 많은 돈을 벌고 싶어서"], "correct": 0 },
+                { "question": "첫 번째 증서의 내용이 아닌 것은?", "answers": ["돈을 만지지 말 것", "오경에 일어날 것", "이웃의 소를 먼저 쓸 것"], "correct": 2 },
+                { "question": "두 번째 증서를 듣고 부자가 한 말 '장차 나를 도둑놈으로 만들 셈입니까?'가 비판하는 것은?", "answers": ["양반의 무능", "양반의 횡포", "양반의 위선"], "correct": 1 },
+                { "question": "이 소설은 인물의 행동을 통해 대상을 비판하는 어떤 방법을 사용하고 있는가?", "answers": ["직접적 비판", "우회적 비판(풍자)", "감정적 호소"], "correct": 1 },
+                { "question": "작품 속 '양반'은 어떤 인물 유형을 대표하는가?", "answers": ["성공한 양반", "깨어있는 양반", "몰락하는 양반"], "correct": 2 },
+                { "question": "작품 속 '부자'는 어떤 계층을 대표하는가?", "answers": ["신흥 상인 계층", "전통 양반 계층", "가난한 농민 계층"], "correct": 0 },
+                { "question": "작가가 두 개의 다른 내용의 증서를 만든 의도는?", "answers": ["양반의 이중성을 폭로하기 위해", "부자에게 선택권을 주기 위해", "독자에게 재미를 주기 위해"], "correct": 0 },
+                { "question": "이 작품은 어떤 문체로 쓰여 있는가?", "answers": ["한글체", "한문체", "이두"], "correct": 1 }
+            ]
+        };
+        
+        let carPosition, score, currentQuestionIndex, gameLoopId, playerName, currentQuizData, currentQuizKey;
+        let isGameActive = false;
+        let questionInProgress = false;
+
+        const initGame = () => {
+            carPosition = 1; score = 0; currentQuestionIndex = 0;
+            isGameActive = true; questionInProgress = false;
+            elements.playerInfo.classList.remove('hidden');
+            elements.scoreDisplay.classList.remove('hidden');
+            elements.playerNameDisplay.textContent = playerName;
+            document.querySelectorAll('.road-line').forEach(line => line.style.animationPlayState = 'running');
+            updateScore();
+            shuffleQuiz();
+            loadQuestion();
+            updateCarPosition();
+            elements.quizSelectionContainer.classList.add('hidden');
+            elements.startScreen.classList.add('hidden');
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            gameLoopId = requestAnimationFrame(gameLoop);
+        };
+
+        const gameLoop = () => {
+            if (!isGameActive) return;
+            const carRect = elements.car.getBoundingClientRect();
+            const answersRect = elements.answersContainer.getBoundingClientRect();
+            if (questionInProgress && answersRect.bottom > carRect.top && answersRect.top < carRect.bottom) {
+                handleCollision();
+            }
+            if (questionInProgress && answersRect.top > window.innerHeight) {
+                handleCollision(true);
+            }
+            gameLoopId = requestAnimationFrame(gameLoop);
+        };
+        
+        const handleCollision = (missed = false) => {
+            if (!questionInProgress) return;
+            questionInProgress = false;
+            elements.answersContainer.style.animationPlayState = 'paused';
+            const currentQuiz = currentQuizData[currentQuestionIndex];
+            const correctGate = elements.answersContainer.children[currentQuiz.correct];
+            if (missed) {
+                if (correctGate) correctGate.classList.replace('bg-blue-500', 'bg-yellow-500');
+                playSound('incorrect');
+            } else {
+                if (carPosition === currentQuiz.correct) {
+                    score += 5; updateScore();
+                    correctGate.classList.replace('bg-blue-500', 'bg-green-500');
+                    playSound('correct');
+                } else {
+                    const wrongGate = elements.answersContainer.children[carPosition];
+                    if (wrongGate) wrongGate.classList.replace('bg-blue-500', 'bg-red-600');
+                    if (correctGate) correctGate.classList.replace('bg-blue-500', 'bg-green-500');
+                    playSound('incorrect');
+                }
+            }
+            currentQuestionIndex++;
+            setTimeout(loadQuestion, 1000);
+        };
+
+        const checkAnswerNow = () => { if (questionInProgress) handleCollision(false); };
+
+        const shuffleQuiz = () => {
+            for (let i = currentQuizData.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentQuizData[i], currentQuizData[j]] = [currentQuizData[j], currentQuizData[i]];
+            }
+        };
+
+        const loadQuestion = () => {
+            if (currentQuestionIndex >= currentQuizData.length) {
+                endGame();
+                return;
+            }
+            questionInProgress = true;
+            const currentQuiz = currentQuizData[currentQuestionIndex];
+            elements.question.textContent = `Q${currentQuestionIndex + 1}. ${currentQuiz.question}`;
+            elements.answersContainer.innerHTML = '';
+            currentQuiz.answers.forEach((answer) => {
+                const answerEl = document.createElement('div');
+                answerEl.className = 'w-1/3 h-full flex items-center justify-center text-white text-base md:text-lg font-bold p-2 text-center bg-blue-500 bg-opacity-75 border-2 border-blue-300 rounded-lg';
+                answerEl.textContent = answer;
+                elements.answersContainer.appendChild(answerEl);
+            });
+            elements.answersContainer.classList.remove('falling');
+            void elements.answersContainer.offsetWidth;
+            elements.answersContainer.style.animationPlayState = 'running';
+            elements.answersContainer.classList.add('falling');
+        };
+
+        const endGame = async () => {
+            isGameActive = false;
+            cancelAnimationFrame(gameLoopId);
+            document.querySelectorAll('.road-line').forEach(line => line.style.animationPlayState = 'paused');
+            await saveScore(playerName, score, currentQuizKey);
+            await displayLeaderboard(currentQuizKey);
+            elements.question.textContent = `퀴즈 완료! 최종 점수: ${scor
